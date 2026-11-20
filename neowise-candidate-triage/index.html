@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Входящие заявки</title>
+  <style>
+    body { max-width: 40rem; margin: 2rem auto; padding: 0 1rem; font: 1rem/1.5 system-ui, sans-serif; }
+    textarea { box-sizing: border-box; display: block; width: 100%; margin: .5rem 0; padding: .5rem; font: inherit; }
+    button { padding: .4rem .8rem; font: inherit; }
+    pre { white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Входящие заявки</h1>
+  <form>
+    <label for="message">Текст заявки</label>
+    <textarea id="message" rows="4"></textarea>
+    <button type="submit">Разобрать заявку</button>
+  </form>
+  <pre id="result" aria-live="polite"></pre>
+  <script type="module">
+    const form = document.querySelector("form");
+    const result = document.querySelector("#result");
+    let latestRequest = 0;
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const requestId = ++latestRequest;
+      const text = document.querySelector("#message").value;
+      if (!text.trim()) {
+        result.textContent = "Введите текст заявки для разбора.";
+        return;
+      }
+      result.textContent = "Разбираем заявку…";
+      try {
+        const reply = await fetch("/api/triage", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        });
+        const body = await reply.json();
+        if (requestId !== latestRequest) return;
+        if (!reply.ok) {
+          result.textContent = "Не удалось разобрать заявку. Проверьте текст и попробуйте снова.";
+        } else if (body.status === "ready") {
+          result.textContent = `Тема: ${body.topic}\n\nЧерновик ответа:\n${body.draft}`;
+        } else {
+          result.textContent = "Не удалось подготовить черновик. Разберите заявку вручную и напишите ответ самостоятельно.";
+        }
+      } catch {
+        if (requestId === latestRequest) {
+          result.textContent = "Сервис временно недоступен. Разберите заявку вручную и напишите ответ самостоятельно.";
+        }
+      }
+    });
+  </script>
+</body>
+</html>
